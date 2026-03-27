@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { QueryProvider } from "@/lib/query-provider";
+import { NextAuthProvider } from "@/components/providers/session-provider";
 import { CookieConsent } from "@/components/legal/cookie-consent";
 
 const geistSans = Geist({
@@ -47,11 +48,13 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >
-        <QueryProvider>
-          {children}
-          <Toaster />
-          <CookieConsent />
-        </QueryProvider>
+        <NextAuthProvider>
+          <QueryProvider>
+            {children}
+            <Toaster />
+            <CookieConsent />
+          </QueryProvider>
+        </NextAuthProvider>
       </body>
     </html>
   );
