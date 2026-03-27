@@ -3782,3 +3782,4 @@ https://nextjs.org/docs/messages/module-not-found
 ✓ Compiled in 206ms
 ✓ Compiled in 118ms
 ✓ Compiled in 466ms
+ GET / 200 in 1089ms (compile: 579ms, proxy.ts: 3ms, render: 506ms)

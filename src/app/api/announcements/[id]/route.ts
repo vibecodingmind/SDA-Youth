@@ -10,12 +10,7 @@ export async function GET(
     const { id } = await params;
 
     const announcement = await db.announcement.findUnique({
-      where: { id },
-      include: {
-        author: {
-          select: { id: true, name: true, image: true, role: true }
-        }
-      }
+      where: { id }
     });
 
     if (!announcement) {
@@ -43,37 +38,25 @@ export async function PUT(
     const { 
       title, 
       content, 
-      type, 
       priority, 
       image, 
-      isPublished,
+      isActive,
       expiresAt
     } = body;
 
     const data: Record<string, unknown> = {};
     if (title !== undefined) data.title = title;
     if (content !== undefined) data.content = content;
-    if (type !== undefined) data.type = type;
     if (priority !== undefined) data.priority = priority;
     if (image !== undefined) data.image = image;
-    if (isPublished !== undefined) {
-      data.isPublished = isPublished;
-      if (isPublished) {
-        data.publishedAt = new Date();
-      }
-    }
+    if (isActive !== undefined) data.isActive = isActive;
     if (expiresAt !== undefined) {
       data.expiresAt = expiresAt ? new Date(expiresAt) : null;
     }
 
     const announcement = await db.announcement.update({
       where: { id },
-      data,
-      include: {
-        author: {
-          select: { id: true, name: true, image: true, role: true }
-        }
-      }
+      data
     });
 
     return NextResponse.json({ announcement });

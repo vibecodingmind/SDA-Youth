@@ -13,17 +13,25 @@ export async function GET(request: NextRequest) {
     const announcements = await db.announcement.findMany({
       where: {
         isActive: true,
-        OR: [
-          { publishAt: null },
-          { publishAt: { lte: now } },
-        ],
-        OR: [
-          { expiresAt: null },
-          { expiresAt: { gte: now } },
-        ],
-        OR: [
-          { targetRole: null },
-          { targetRole: role },
+        AND: [
+          {
+            OR: [
+              { publishAt: null },
+              { publishAt: { lte: now } },
+            ],
+          },
+          {
+            OR: [
+              { expiresAt: null },
+              { expiresAt: { gte: now } },
+            ],
+          },
+          {
+            OR: [
+              { targetRole: null },
+              { targetRole: role },
+            ],
+          },
         ],
       },
       take: limit,
