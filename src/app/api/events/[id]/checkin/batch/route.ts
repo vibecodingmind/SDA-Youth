@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { generateCheckInCodes } from '@/lib/qrcode';
+import { generateBatchCheckInCodes } from '@/lib/qrcode';
 
 // POST /api/events/[id]/checkin/batch - Create batch check-in codes
 export async function POST(
@@ -22,7 +22,7 @@ export async function POST(
     }
 
     // Generate batch of unique codes
-    const codes = generateCheckInCodes(count);
+    const codes = generateBatchCheckInCodes(count);
 
     // Create check-in records for each code
     const checkIns = await Promise.all(
