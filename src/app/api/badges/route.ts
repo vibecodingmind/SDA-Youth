@@ -1,34 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { getOrSet, CacheTTL, CacheKeys, invalidateCache } from '@/lib/cache';
 
-// Get all badges
+// Get all badges (with caching)
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category');
 
-    const where = category ? { category } : {};
+    const cacheKey = category 
+      ? `${CacheKeys.badges()}:category:${category}`
+      : CacheKeys.badges();
 
-    const badges = await db.badge.findMany({
-      where,
-      orderBy: {
-        points: 'desc',
-      },
-      include: {
-        _count: {
-          select: {
-            users: true,
+    const badges = await getOrSet(
+      cacheKey,
+      async () => {
+        const where = category ? { category } : {};
+
+        const result = await db.badge.findMany({
+          where,
+          orderBy: {
+            points: 'desc',
           },
-        },
-      },
-    });
+          include: {
+            _count: {
+              select: {
+                users: true,
+              },
+            },
+          },
+        });
 
-    return NextResponse.json({
-      badges: badges.map((badge) => ({
-        ...badge,
-        earnedBy: badge._count.users,
-      })),
-    });
+        return result.map((badge) => ({
+          ...badge,
+          earnedBy: badge._count.users,
+        }));
+      },
+      CacheTTL.BADGES
+    );
+
+    return NextResponse.json({ badges });
   } catch (error) {
     console.error('Badges fetch error:', error);
     return NextResponse.json(
@@ -38,7 +49,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Create new badge (admin only)
+// Create new badge (admin only) - invalidate cache on create
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -60,6 +71,9 @@ export async function POST(request: NextRequest) {
         category: category || 'general',
       },
     });
+
+    // Invalidate badges cache
+    invalidateCache('badges:*');
 
     return NextResponse.json({ badge });
   } catch (error) {

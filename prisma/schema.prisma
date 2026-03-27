@@ -32,6 +32,12 @@ model User {
   emailVerified DateTime?
   dateOfBirth   DateTime?
   bio           String?
+  // Onboarding fields
+  onboardingCompleted Boolean @default(false)
+  onboardingStep      Int     @default(0)
+  interests           String? // JSON string of selected interests
+  notificationPrefs   String? // JSON string of notification preferences
+  timezone            String? @default("UTC")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   
@@ -71,6 +77,13 @@ model User {
   articles           Article[]
   prayerPartners     PrayerPartner[]   @relation("PrayerPartnerOwner")
   prayerPartnerOf    PrayerPartner[]   @relation("PrayerPartnerTarget")
+
+  // Performance indexes
+  @@index([role])
+  @@index([createdAt])
+  @@index([points])
+  @@index([isActive])
+  @@index([role, isActive])
 }
 
 // NextAuth models
@@ -167,6 +180,12 @@ model Event {
   photos          EventPhoto[]
   feedbacks       EventFeedback[]
   checkIns        CheckIn[]
+
+  // Performance indexes
+  @@index([startDate])
+  @@index([status])
+  @@index([creatorId])
+  @@index([status, startDate])
 }
 
 model RSVP {
@@ -180,6 +199,12 @@ model RSVP {
   event     Event    @relation(fields: [eventId], references: [id])
   
   @@unique([userId, eventId])
+
+  // Performance indexes
+  @@index([eventId])
+  @@index([userId])
+  @@index([status])
+  @@index([eventId, status])
 }
 
 model EventPhoto {
@@ -249,6 +274,9 @@ model Badge {
   createdAt   DateTime @default(now())
   
   users       UserBadge[]
+
+  // Performance indexes
+  @@index([category])
 }
 
 model UserBadge {
@@ -278,6 +306,12 @@ model Notification {
   createdAt DateTime @default(now())
   
   user      User     @relation(fields: [userId], references: [id])
+
+  // Performance indexes
+  @@index([userId])
+  @@index([isRead])
+  @@index([userId, isRead])
+  @@index([createdAt(sort: Desc)])
 }
 
 model PointHistory {
@@ -289,6 +323,11 @@ model PointHistory {
   createdAt DateTime @default(now())
   
   user      User     @relation(fields: [userId], references: [id])
+
+  // Performance indexes
+  @@index([userId])
+  @@index([createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
 }
 
 model EmailLog {
@@ -345,6 +384,11 @@ model ChatMessage {
   
   room      ChatRoom @relation(fields: [roomId], references: [id])
   sender    User     @relation(fields: [senderId], references: [id])
+
+  // Performance indexes
+  @@index([roomId])
+  @@index([senderId])
+  @@index([roomId, createdAt(sort: Desc)])
 }
 
 model Conversation {
@@ -401,6 +445,13 @@ model PrayerRequest {
   
   author      User             @relation(fields: [authorId], references: [id])
   reactions   PrayerReaction[]
+
+  // Performance indexes
+  @@index([authorId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([isAnswered])
 }
 
 model PrayerReaction {
@@ -459,6 +510,13 @@ model ForumTopic {
   category    ForumCategory @relation(fields: [categoryId], references: [id])
   author      User          @relation(fields: [authorId], references: [id])
   posts       ForumPost[]
+
+  // Performance indexes
+  @@index([categoryId])
+  @@index([authorId])
+  @@index([createdAt(sort: Desc)])
+  @@index([categoryId, createdAt(sort: Desc)])
+  @@index([isPinned, createdAt(sort: Desc)])
 }
 
 model ForumPost {
@@ -471,6 +529,12 @@ model ForumPost {
   
   topic     ForumTopic @relation(fields: [topicId], references: [id])
   author    User       @relation(fields: [authorId], references: [id])
+
+  // Performance indexes
+  @@index([topicId])
+  @@index([authorId])
+  @@index([createdAt(sort: Desc)])
+  @@index([topicId, createdAt(sort: Desc)])
 }
 
 // ============================================
@@ -507,6 +571,9 @@ model Devotional {
   createdAt   DateTime @default(now())
   
   readings    DevotionalReading[]
+
+  // Performance indexes
+  @@index([date])
 }
 
 model DevotionalReading {
@@ -600,6 +667,13 @@ model Article {
   updatedAt   DateTime @updatedAt
   
   author      User     @relation(fields: [authorId], references: [id])
+
+  // Performance indexes
+  @@index([status])
+  @@index([authorId])
+  @@index([category])
+  @@index([status, publishedAt(sort: Desc)])
+  @@index([publishedAt(sort: Desc)])
 }
 
 // ============================================
@@ -612,6 +686,9 @@ model DailyVerse {
   reference String
   date      DateTime @unique
   createdAt DateTime @default(now())
+
+  // Performance indexes
+  @@index([date])
 }
 
 // ============================================

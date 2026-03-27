@@ -43,7 +43,8 @@ export default function SignUpPage() {
       if (!response.ok) {
         setError(data.error || 'Failed to create account');
       } else {
-        router.push('/auth/signin?registered=true');
+        // Redirect to verification page with email
+        router.push(`/auth/verify?email=${encodeURIComponent(email)}`);
       }
     } catch {
       setError('An error occurred');

@@ -15,7 +15,7 @@ function getResendClient(): Resend | null {
 }
 
 // Email types
-export type EmailTemplate = 'welcome' | 'eventReminder' | 'certificate' | 'passwordReset' | 'eventConfirmation';
+export type EmailTemplate = 'welcome' | 'eventReminder' | 'certificate' | 'passwordReset' | 'eventConfirmation' | 'emailVerification';
 
 export interface EmailData {
   to: string;
@@ -183,6 +183,41 @@ export const emailTemplates = {
       </div>
     `,
   }),
+
+  emailVerification: (name: string, verificationLink: string) => ({
+    subject: '📧 Verify Your Email Address',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9fafb; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%); padding: 30px; border-radius: 16px 16px 0 0; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">🐝 Welcome to BUSYBEES!</h1>
+        </div>
+        <div style="background: white; padding: 30px; border-radius: 0 0 16px 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+          <h2 style="color: #1f2937; margin-top: 0;">Hi ${name}!</h2>
+          <p style="color: #4b5563; line-height: 1.6;">
+            Thank you for registering with BUSYBEES SDA Youth Ministry! To complete your registration and access all features, please verify your email address.
+          </p>
+          <div style="background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%); padding: 20px; border-radius: 12px; margin: 20px 0; text-align: center; border: 2px solid #7C3AED;">
+            <p style="color: #4b5563; margin: 0 0 15px 0;">Click the button below to verify your email:</p>
+            <a href="${verificationLink}" 
+               style="display: inline-block; background: #7C3AED; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px;">
+              ✓ Verify Email Address
+            </a>
+          </div>
+          <p style="color: #6b7280; font-size: 14px; margin-top: 20px;">
+            <strong>⏰ This link will expire in 24 hours.</strong><br>
+            If you didn't create an account, you can safely ignore this email.
+          </p>
+          <p style="color: #6b7280; font-size: 14px; margin-top: 20px;">
+            If the button doesn't work, copy and paste this link into your browser:<br>
+            <a href="${verificationLink}" style="color: #7C3AED; word-break: break-all;">${verificationLink}</a>
+          </p>
+          <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
+            Blessings,<br>The BUSYBEES Team
+          </p>
+        </div>
+      </div>
+    `,
+  }),
 };
 
 // Send email function
@@ -233,6 +268,12 @@ export async function sendEmail(
           data.eventTitle || 'Event',
           data.eventDate || 'TBD',
           data.eventLocation || 'TBD'
+        );
+        break;
+      case 'emailVerification':
+        template = emailTemplates.emailVerification(
+          data.name || 'Friend',
+          data.verificationLink || ''
         );
         break;
       default:

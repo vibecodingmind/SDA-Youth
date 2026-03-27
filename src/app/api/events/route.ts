@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { getOrSet, CacheTTL, CacheKeys, invalidateCache } from '@/lib/cache';
 
-// GET /api/events - Get all events with filters
+// GET /api/events - Get all events with filters (with caching)
 export async function GET(request: NextRequest) {
   try {
     const searchParams = Object.fromEntries(request.nextUrl.searchParams);
@@ -14,55 +15,65 @@ export async function GET(request: NextRequest) {
       offset = '0',
     } = searchParams;
 
-    const where: Record<string, unknown> = {};
+    // Build cache key based on filters
+    const cacheKey = `${CacheKeys.eventsList(status)}:${upcoming}:${past}:${recurring}:${limit}:${offset}`;
 
-    // Apply filters
-    if (status) {
-      where.status = status;
-    }
+    const result = await getOrSet(
+      cacheKey,
+      async () => {
+        const where: Record<string, unknown> = {};
 
-    if (upcoming === 'true') {
-      where.startDate = { gte: new Date() };
-      where.status = { notIn: ['cancelled', 'completed'] };
-    }
+        // Apply filters
+        if (status) {
+          where.status = status;
+        }
 
-    if (past === 'true') {
-      where.startDate = { lt: new Date() };
-    }
+        if (upcoming === 'true') {
+          where.startDate = { gte: new Date() };
+          where.status = { notIn: ['cancelled', 'completed'] };
+        }
 
-    if (recurring === 'true') {
-      where.isRecurring = true;
-      where.parentEventId = null; // Only parent recurring events
-    } else if (recurring === 'false') {
-      where.isRecurring = false;
-    }
+        if (past === 'true') {
+          where.startDate = { lt: new Date() };
+        }
 
-    const events = await db.event.findMany({
-      where,
-      include: {
-        creator: {
-          select: { id: true, name: true, email: true, image: true },
-        },
-        _count: {
-          select: { rsvps: true, checkIns: true, photos: true },
-        },
+        if (recurring === 'true') {
+          where.isRecurring = true;
+        } else if (recurring === 'false') {
+          where.isRecurring = false;
+        }
+
+        const events = await db.event.findMany({
+          where,
+          include: {
+            creator: {
+              select: { id: true, name: true, email: true, image: true },
+            },
+            _count: {
+              select: { rsvps: true, checkIns: true, photos: true },
+            },
+          },
+          orderBy: { startDate: 'asc' },
+          take: parseInt(limit),
+          skip: parseInt(offset),
+        });
+
+        const total = await db.event.count({ where });
+
+        return {
+          events,
+          pagination: {
+            total,
+            limit: parseInt(limit),
+            offset: parseInt(offset),
+            hasMore: parseInt(offset) + events.length < total,
+          },
+        };
       },
-      orderBy: { startDate: 'asc' },
-      take: parseInt(limit),
-      skip: parseInt(offset),
-    });
+      CacheTTL.EVENTS_LIST
+    );
 
-    const total = await db.event.count({ where });
-
-    return NextResponse.json({
-      events,
-      pagination: {
-        total,
-        limit: parseInt(limit),
-        offset: parseInt(offset),
-        hasMore: parseInt(offset) + events.length < total,
-      },
-    });
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Error fetching events:', error);
     return NextResponse.json(
@@ -72,7 +83,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/events - Create a new event
+// POST /api/events - Create a new event (invalidate cache on create)
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -110,10 +121,8 @@ export async function POST(request: NextRequest) {
         points,
         creatorId,
         isRecurring,
-        recurrenceType: isRecurring ? recurrenceType : null,
+        recurrenceRule: isRecurring ? recurrenceType : null,
         recurrenceEnd: isRecurring && recurrenceEnd ? new Date(recurrenceEnd) : null,
-        recurrenceCount: isRecurring ? recurrenceCount : null,
-        recurrenceDays: isRecurring ? recurrenceDays : null,
       },
       include: {
         creator: {
@@ -121,6 +130,9 @@ export async function POST(request: NextRequest) {
         },
       },
     });
+
+    // Invalidate events cache
+    invalidateCache('events:list:*');
 
     return NextResponse.json({ event });
   } catch (error) {
