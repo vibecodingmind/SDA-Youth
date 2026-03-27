@@ -1,7 +1,18 @@
 import { Resend } from 'resend';
 
-// Initialize Resend client
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy-initialize Resend client only when needed
+let resendClient: Resend | null = null;
+
+function getResendClient(): Resend | null {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('RESEND_API_KEY is not set. Email sending is disabled.');
+    return null;
+  }
+  if (!resendClient) {
+    resendClient = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resendClient;
+}
 
 // Email types
 export type EmailTemplate = 'welcome' | 'eventReminder' | 'certificate' | 'passwordReset' | 'eventConfirmation';
@@ -181,6 +192,13 @@ export async function sendEmail(
   data: Record<string, string>
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    const resend = getResendClient();
+    
+    if (!resend) {
+      console.log(`Email sending skipped (no API key): ${type} to ${to}`);
+      return { success: true }; // Return success to not block flows
+    }
+
     let template;
     let subject: string;
 
@@ -242,4 +260,4 @@ export async function sendEmail(
   }
 }
 
-export default resend;
+export { getResendClient };
