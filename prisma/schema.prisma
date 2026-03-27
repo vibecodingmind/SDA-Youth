@@ -1,0 +1,874 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER & AUTHENTICATION
+// ============================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  password      String?
+  image         String?
+  phone         String?
+  role          String    @default("member") // admin, leader, member
+  points        Int       @default(0)
+  streak        Int       @default(0)
+  maxStreak     Int       @default(0)
+  lastActive    DateTime?
+  isActive      Boolean   @default(true)
+  twoFactorEnabled Boolean @default(false)
+  twoFactorSecret String?
+  emailVerified DateTime?
+  dateOfBirth   DateTime?
+  bio           String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  accounts          Account[]
+  sessions          Session[]
+  posts              Post[]
+  comments           Comment[]
+  events             Event[]
+  rsvps              RSVP[]
+  certificates       Certificate[]
+  badges             UserBadge[]
+  notifications      Notification[]
+  pointHistory       PointHistory[]
+  chatMessages       ChatMessage[]
+  chatRoomMembers    ChatRoomMember[]
+  prayerRequests     PrayerRequest[]
+  prayerReactions    PrayerReaction[]
+  forumTopics        ForumTopic[]
+  forumPosts         ForumPost[]
+  sentMessages       DirectMessage[]  @relation("SentMessages")
+  receivedMessages   DirectMessage[]  @relation("ReceivedMessages")
+  conversations      ConversationMember[]
+  checkIns           CheckIn[]
+  feedbacks          EventFeedback[]
+  devotionalReadings DevotionalReading[]
+  smallGroupMembers  SmallGroupMember[]
+  mentorshipsMentee  Mentorship[]      @relation("MenteeMentorships")
+  mentorshipsMentor  Mentorship[]      @relation("MentorMentorships")
+  testimonies        Testimony[]
+  dailyChallenges    DailyChallengeCompletion[]
+  questProgress      QuestProgress[]
+  rewardRedemptions  RewardRedemption[]
+  volunteerAssignments VolunteerAssignment[]
+  auditLogs          AuditLog[]
+  documents          Document[]
+  articles           Article[]
+  prayerPartners     PrayerPartner[]   @relation("PrayerPartnerOwner")
+  prayerPartnerOf    PrayerPartner[]   @relation("PrayerPartnerTarget")
+}
+
+// NextAuth models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============================================
+// POSTS & COMMENTS (Community)
+// ============================================
+
+model Post {
+  id          String   @id @default(cuid())
+  title       String
+  content     String?
+  image       String?
+  status      String   @default("pending") // pending, approved, rejected
+  authorId    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  author      User     @relation(fields: [authorId], references: [id])
+  comments    Comment[]
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  postId    String
+  authorId  String
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  post      Post     @relation(fields: [postId], references: [id])
+  author    User     @relation(fields: [authorId], references: [id])
+}
+
+// ============================================
+// EVENTS
+// ============================================
+
+model Event {
+  id              String   @id @default(cuid())
+  title           String
+  description     String?
+  location        String?
+  startDate       DateTime
+  endDate         DateTime?
+  image           String?
+  status          String   @default("upcoming") // upcoming, ongoing, completed, cancelled
+  points          Int      @default(10)
+  isRecurring     Boolean  @default(false)
+  recurrenceRule  String?  // daily, weekly, monthly, yearly
+  recurrenceEnd   DateTime?
+  qrCode          String?
+  creatorId       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  creator         User     @relation(fields: [creatorId], references: [id])
+  rsvps           RSVP[]
+  photos          EventPhoto[]
+  feedbacks       EventFeedback[]
+  checkIns        CheckIn[]
+}
+
+model RSVP {
+  id        String   @id @default(cuid())
+  userId    String
+  eventId   String
+  status    String   @default("registered") // registered, attended, cancelled
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id])
+  event     Event    @relation(fields: [eventId], references: [id])
+  
+  @@unique([userId, eventId])
+}
+
+model EventPhoto {
+  id          String   @id @default(cuid())
+  eventId     String
+  uploadedBy  String
+  url         String
+  caption     String?
+  createdAt   DateTime @default(now())
+  
+  event       Event    @relation(fields: [eventId], references: [id])
+}
+
+model CheckIn {
+  id        String   @id @default(cuid())
+  userId    String
+  eventId   String
+  method    String   @default("manual") // manual, qr, admin
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id])
+  event     Event    @relation(fields: [eventId], references: [id])
+  
+  @@unique([userId, eventId])
+}
+
+model EventFeedback {
+  id        String   @id @default(cuid())
+  userId    String
+  eventId   String
+  rating    Int      // 1-5
+  comment   String?
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id])
+  event     Event    @relation(fields: [eventId], references: [id])
+  
+  @@unique([userId, eventId])
+}
+
+// ============================================
+// CERTIFICATES & BADGES
+// ============================================
+
+model Certificate {
+  id            String   @id @default(cuid())
+  title         String
+  description   String?
+  issuedTo      String
+  issuedToId    String
+  issuedBy      String
+  issuedDate    DateTime @default(now())
+  certificateId String   @unique
+  type          String   @default("achievement") // achievement, completion, participation
+  createdAt     DateTime @default(now())
+  
+  user          User     @relation(fields: [issuedToId], references: [id])
+}
+
+model Badge {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  icon        String?
+  points      Int      @default(0)
+  category    String   @default("general") // general, attendance, contribution, leadership
+  createdAt   DateTime @default(now())
+  
+  users       UserBadge[]
+}
+
+model UserBadge {
+  id        String   @id @default(cuid())
+  userId    String
+  badgeId   String
+  earnedAt  DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id])
+  badge     Badge    @relation(fields: [badgeId], references: [id])
+  
+  @@unique([userId, badgeId])
+}
+
+// ============================================
+// NOTIFICATIONS & POINTS
+// ============================================
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String   @default("info") // info, success, warning, achievement
+  isRead    Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model PointHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  points    Int
+  reason    String
+  type      String   @default("earned") // earned, spent, bonus
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model EmailLog {
+  id        String   @id @default(cuid())
+  to        String
+  subject   String
+  type      String
+  status    String   @default("pending") // pending, sent, failed
+  error     String?
+  createdAt DateTime @default(now())
+}
+
+// ============================================
+// CHAT & MESSAGING
+// ============================================
+
+model ChatRoom {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  type        String   @default("group") // group, direct, announcement
+  image       String?
+  createdBy   String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  members     ChatRoomMember[]
+  messages    ChatMessage[]
+}
+
+model ChatRoomMember {
+  id        String   @id @default(cuid())
+  userId    String
+  roomId    String
+  role      String   @default("member") // admin, member
+  lastRead  DateTime?
+  joinedAt  DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id])
+  room      ChatRoom @relation(fields: [roomId], references: [id])
+  
+  @@unique([userId, roomId])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  roomId    String
+  senderId  String
+  content   String
+  type      String   @default("text") // text, image, file
+  replyTo   String?
+  createdAt DateTime @default(now())
+  
+  room      ChatRoom @relation(fields: [roomId], references: [id])
+  sender    User     @relation(fields: [senderId], references: [id])
+}
+
+model Conversation {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  members   ConversationMember[]
+  messages  DirectMessage[]
+}
+
+model ConversationMember {
+  id             String   @id @default(cuid())
+  conversationId String
+  userId         String
+  lastRead       DateTime?
+  
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  user           User         @relation(fields: [userId], references: [id])
+  
+  @@unique([conversationId, userId])
+}
+
+model DirectMessage {
+  id             String   @id @default(cuid())
+  conversationId String
+  senderId       String
+  receiverId     String
+  content        String
+  type           String   @default("text")
+  isRead         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  sender         User         @relation("SentMessages", fields: [senderId], references: [id])
+  receiver       User         @relation("ReceivedMessages", fields: [receiverId], references: [id])
+}
+
+// ============================================
+// PRAYER WALL
+// ============================================
+
+model PrayerRequest {
+  id          String   @id @default(cuid())
+  authorId    String
+  title       String
+  content     String
+  isAnonymous Boolean  @default(false)
+  isAnswered  Boolean  @default(false)
+  answerNote  String?
+  status      String   @default("active") // active, answered, archived
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  author      User             @relation(fields: [authorId], references: [id])
+  reactions   PrayerReaction[]
+}
+
+model PrayerReaction {
+  id        String   @id @default(cuid())
+  requestId String
+  userId    String
+  type      String   @default("praying") // praying, amen
+  createdAt DateTime @default(now())
+  
+  request   PrayerRequest @relation(fields: [requestId], references: [id])
+  user      User          @relation(fields: [userId], references: [id])
+  
+  @@unique([requestId, userId])
+}
+
+model PrayerPartner {
+  id        String   @id @default(cuid())
+  userId    String
+  partnerId String
+  status    String   @default("active") // active, inactive
+  createdAt DateTime @default(now())
+  
+  user      User     @relation("PrayerPartnerOwner", fields: [userId], references: [id])
+  partner   User     @relation("PrayerPartnerTarget", fields: [partnerId], references: [id])
+  
+  @@unique([userId, partnerId])
+}
+
+// ============================================
+// FORUM
+// ============================================
+
+model ForumCategory {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  icon        String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  
+  topics      ForumTopic[]
+}
+
+model ForumTopic {
+  id          String   @id @default(cuid())
+  categoryId  String
+  authorId    String
+  title       String
+  content     String
+  isPinned    Boolean  @default(false)
+  isLocked    Boolean  @default(false)
+  viewCount   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  category    ForumCategory @relation(fields: [categoryId], references: [id])
+  author      User          @relation(fields: [authorId], references: [id])
+  posts       ForumPost[]
+}
+
+model ForumPost {
+  id        String   @id @default(cuid())
+  topicId   String
+  authorId  String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  topic     ForumTopic @relation(fields: [topicId], references: [id])
+  author    User       @relation(fields: [authorId], references: [id])
+}
+
+// ============================================
+// ANNOUNCEMENTS
+// ============================================
+
+model Announcement {
+  id          String   @id @default(cuid())
+  title       String
+  content     String
+  image       String?
+  priority    String   @default("normal") // low, normal, high, urgent
+  targetRole  String?  // null = all, admin, leader, member
+  isActive    Boolean  @default(true)
+  publishAt   DateTime?
+  expiresAt   DateTime?
+  authorId    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ============================================
+// DEVOTIONALS & BIBLE STUDY
+// ============================================
+
+model Devotional {
+  id          String   @id @default(cuid())
+  title       String
+  content     String
+  scripture   String
+  verse       String?
+  author      String?
+  date        DateTime @unique
+  createdAt   DateTime @default(now())
+  
+  readings    DevotionalReading[]
+}
+
+model DevotionalReading {
+  id            String   @id @default(cuid())
+  devotionalId  String
+  userId        String
+  completedAt   DateTime @default(now())
+  
+  devotional    Devotional @relation(fields: [devotionalId], references: [id])
+  user          User       @relation(fields: [userId], references: [id])
+  
+  @@unique([devotionalId, userId])
+}
+
+model BibleStudy {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  content     String
+  category    String?
+  difficulty  String   @default("beginner") // beginner, intermediate, advanced
+  duration    Int?     // in minutes
+  authorId    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  sections    StudySection[]
+}
+
+model StudySection {
+  id          String   @id @default(cuid())
+  studyId     String
+  title       String
+  content     String
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  
+  study       BibleStudy @relation(fields: [studyId], references: [id])
+}
+
+// ============================================
+// VIDEOS & DOCUMENTS
+// ============================================
+
+model Video {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  url         String
+  thumbnail   String?
+  category    String?
+  duration    Int?
+  authorId    String
+  viewCount   Int      @default(0)
+  createdAt   DateTime @default(now())
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  url         String
+  type        String   // pdf, doc, etc.
+  category    String?
+  size        Int?
+  authorId    String
+  downloadCount Int    @default(0)
+  createdAt   DateTime @default(now())
+  
+  author      User     @relation(fields: [authorId], references: [id])
+}
+
+// ============================================
+// ARTICLES / BLOG
+// ============================================
+
+model Article {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  content     String
+  excerpt     String?
+  image       String?
+  category    String?
+  tags        String?
+  authorId    String
+  status      String   @default("draft") // draft, published, archived
+  viewCount   Int      @default(0)
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  author      User     @relation(fields: [authorId], references: [id])
+}
+
+// ============================================
+// DAILY VERSE
+// ============================================
+
+model DailyVerse {
+  id        String   @id @default(cuid())
+  verse     String
+  reference String
+  date      DateTime @unique
+  createdAt DateTime @default(now())
+}
+
+// ============================================
+// GAMIFICATION - CHALLENGES, QUESTS, REWARDS
+// ============================================
+
+model DailyChallenge {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  points      Int      @default(10)
+  type        String   // read_bible, attend_event, pray, share
+  targetCount Int      @default(1)
+  date        DateTime @unique
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  
+  completions DailyChallengeCompletion[]
+}
+
+model DailyChallengeCompletion {
+  id          String   @id @default(cuid())
+  challengeId String
+  userId      String
+  completedAt DateTime @default(now())
+  
+  challenge   DailyChallenge @relation(fields: [challengeId], references: [id])
+  user        User           @relation(fields: [userId], references: [id])
+  
+  @@unique([challengeId, userId])
+}
+
+model Quest {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  points      Int      @default(50)
+  icon        String?
+  category    String?
+  isRequired  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  
+  progress    QuestProgress[]
+}
+
+model QuestProgress {
+  id        String   @id @default(cuid())
+  questId   String
+  userId    String
+  progress  Int      @default(0)
+  target    Int
+  completed Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+  
+  quest     Quest    @relation(fields: [questId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+  
+  @@unique([questId, userId])
+}
+
+model Reward {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  image       String?
+  points      Int
+  stock       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  
+  redemptions RewardRedemption[]
+}
+
+model RewardRedemption {
+  id          String   @id @default(cuid())
+  rewardId    String
+  userId      String
+  status      String   @default("pending") // pending, approved, rejected, fulfilled
+  redeemedAt  DateTime @default(now())
+  
+  reward      Reward   @relation(fields: [rewardId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+// ============================================
+// SMALL GROUPS & MENTORSHIP
+// ============================================
+
+model SmallGroup {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  leaderId    String
+  capacity    Int      @default(15)
+  image       String?
+  meetingTime String?
+  location    String?
+  status      String   @default("active")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  members     SmallGroupMember[]
+}
+
+model SmallGroupMember {
+  id        String   @id @default(cuid())
+  groupId   String
+  userId    String
+  role      String   @default("member") // leader, co-leader, member
+  joinedAt  DateTime @default(now())
+  
+  group     SmallGroup @relation(fields: [groupId], references: [id])
+  user      User       @relation(fields: [userId], references: [id])
+  
+  @@unique([groupId, userId])
+}
+
+model Mentorship {
+  id          String   @id @default(cuid())
+  mentorId    String
+  menteeId    String
+  status      String   @default("active") // active, completed, paused
+  startDate   DateTime @default(now())
+  endDate     DateTime?
+  notes       String?
+  createdAt   DateTime @default(now())
+  
+  mentor      User     @relation("MentorMentorships", fields: [mentorId], references: [id])
+  mentee      User     @relation("MenteeMentorships", fields: [menteeId], references: [id])
+}
+
+// ============================================
+// TESTIMONIES
+// ============================================
+
+model Testimony {
+  id          String   @id @default(cuid())
+  authorId    String
+  title       String
+  content     String
+  scripture   String?
+  tags        String?
+  status      String   @default("pending") // pending, approved, rejected
+  isAnonymous Boolean  @default(false)
+  viewCount   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  author      User     @relation(fields: [authorId], references: [id])
+}
+
+// ============================================
+// COMMITTEES & VOLUNTEERS
+// ============================================
+
+model Committee {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  chairperson String?
+  status      String   @default("active")
+  createdAt   DateTime @default(now())
+  
+  members     CommitteeMember[]
+}
+
+model CommitteeMember {
+  id           String   @id @default(cuid())
+  committeeId  String
+  userId       String
+  role         String   @default("member") // chair, secretary, member
+  joinedAt     DateTime @default(now())
+  
+  committee    Committee @relation(fields: [committeeId], references: [id])
+  
+  @@unique([committeeId, userId])
+}
+
+model VolunteerPosition {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  eventId     String?
+  date        DateTime?
+  spots       Int      @default(1)
+  status      String   @default("open")
+  createdAt   DateTime @default(now())
+  
+  assignments VolunteerAssignment[]
+}
+
+model VolunteerAssignment {
+  id         String   @id @default(cuid())
+  positionId String
+  userId     String
+  status     String   @default("assigned") // assigned, confirmed, completed, cancelled
+  assignedAt DateTime @default(now())
+  
+  position   VolunteerPosition @relation(fields: [positionId], references: [id])
+  user       User              @relation(fields: [userId], references: [id])
+  
+  @@unique([positionId, userId])
+}
+
+// ============================================
+// SECURITY & AUDIT
+// ============================================
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  details   String?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  
+  user      User?    @relation(fields: [userId], references: [id])
+}
+
+model TwoFactorToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+// ============================================
+// PAYMENTS
+// ============================================
+
+model Payment {
+  id              String   @id @default(cuid())
+  userId          String
+  amount          Float
+  currency        String   @default("USD")
+  type            String   // donation, event_fee, merchandise
+  status          String   @default("pending") // pending, completed, failed, refunded
+  reference       String?
+  eventId         String?
+  metadata        String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ============================================
+// SETTINGS
+// ============================================
+
+model Setting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  type      String   @default("string") // string, number, boolean, json
+  updatedAt DateTime @updatedAt
+}
